@@ -24,7 +24,7 @@ A curl-like tool for fetching dynamic web pages with JavaScript rendering suppor
 ### Build from Source
 
 ```bash
-go build -o durl main.go
+go build .
 ```
 
 ## Usage

@@ -22,7 +22,7 @@
 ### 从源码构建
 
 ```bash
-go build -o durl main.go
+go build .
 ```
 
 ## 使用方法

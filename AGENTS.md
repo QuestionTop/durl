@@ -72,11 +72,14 @@ When generating commands for automatic execution, do not include interactive com
   go build -ldflags "-X main.version=<tag>" -o durl.exe .
   ```
 - Plain `go build .` produces a `dev` build (version = "dev")
-- To release a new version:
-  1. Commit all changes
-  2. Tag: `git -c core.autocrlf=false tag v<X.Y>`
-  3. Build: `go build -ldflags "-X main.version=v<X.Y>" -o durl.exe .`
-  4. Push tag: `git push origin v<X.Y>`
+- To release a new version (PowerShell):
+  ```powershell
+  $env:VER="v<X.Y>"
+  git -c core.autocrlf=false tag $env:VER
+  go build -ldflags "-X main.version=$env:VER" -o durl.exe .
+  git push origin $env:VER
+  gh release create $env:VER durl.exe --title $env:VER --notes "Release $env:VER"
+  ```
 
 ### Adding a New --site Plugin
 
