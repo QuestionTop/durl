@@ -6,31 +6,24 @@ import (
 	"github.com/go-rod/rod/lib/proto"
 )
 
-// Browser 封装 rod.Browser 实例
+const defaultUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+// Browser wraps a rod.Browser instance
 type Browser struct {
 	browser  *rod.Browser
 	launcher *launcher.Launcher
-	proxyURL string // 代理URL
+	proxyURL string
 }
 
-// NewBrowser 创建并初始化新的浏览器实例（headless 模式）
-func NewBrowser() (*Browser, error) {
-	return newBrowser("", true)
+// Config holds browser configuration
+type Config struct {
+	ProxyURL string // empty string means no proxy
+	Headless bool   // true = headless (default), false = headed
 }
 
-// NewBrowserWithProxy 创建带代理的 headless 浏览器实例
-func NewBrowserWithProxy(proxyURL string) (*Browser, error) {
-	return newBrowser(proxyURL, true)
-}
-
-// NewBrowserHeaded 创建有界面的浏览器实例
-func NewBrowserHeaded(proxyURL string) (*Browser, error) {
-	return newBrowser(proxyURL, false)
-}
-
-// NewBrowserWithOptions 创建浏览器实例，showUI=true 时显示界面
-func NewBrowserWithOptions(proxyURL string, showUI bool) (*Browser, error) {
-	return newBrowser(proxyURL, !showUI)
+// New creates a browser instance
+func New(cfg Config) (*Browser, error) {
+	return newBrowser(cfg.ProxyURL, cfg.Headless)
 }
 
 func newBrowser(proxyURL string, headless bool) (*Browser, error) {
@@ -52,21 +45,25 @@ func newBrowser(proxyURL string, headless bool) (*Browser, error) {
 	return b, nil
 }
 
-// GetProxyURL 获取当前使用的代理URL
+// GetProxyURL returns the proxy URL in use
 func (b *Browser) GetProxyURL() string {
 	return b.proxyURL
 }
 
-// NewPage 创建新的浏览器页面
+// NewPage creates a new browser page with anti-detection measures applied.
 func (b *Browser) NewPage() (*rod.Page, error) {
 	page, err := b.browser.Page(proto.TargetCreateTarget{})
 	if err != nil {
 		return nil, err
 	}
+	_ = page.SetUserAgent(&proto.NetworkSetUserAgentOverride{
+		UserAgent: defaultUserAgent,
+	})
+	_, _ = page.EvalOnNewDocument(`Object.defineProperty(navigator, 'webdriver', {get: () => undefined});`)
 	return page, nil
 }
 
-// Close 关闭浏览器并清理资源
+// Close shuts down the browser and cleans up resources
 func (b *Browser) Close() error {
 	if b.browser != nil {
 		if err := b.browser.Close(); err != nil {

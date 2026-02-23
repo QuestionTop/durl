@@ -1,4 +1,4 @@
-package extractor
+package generic
 
 import (
 	"fmt"
@@ -8,21 +8,21 @@ import (
 	"github.com/go-rod/rod"
 )
 
-// Extractor 内容提取器
+// Extractor content extractor
 type Extractor struct {
 	page *rod.Page
 }
 
-// NewExtractor 创建新的 Extractor 实例
+// NewExtractor creates a new Extractor instance
 func NewExtractor(page *rod.Page) *Extractor {
 	return &Extractor{
 		page: page,
 	}
 }
 
-// Extract 根据级别提取内容
-// level: 提取级别 (full/html/body/content/xpath/css)
-// selector: 选择器 (仅用于 xpath 和 css 级别)
+// Extract extracts content based on level
+// level: extraction level (full/html/body/content/xpath/css)
+// selector: selector (only for xpath and css levels)
 func (e *Extractor) Extract(level, selector string) (string, error) {
 	switch level {
 	case "full":
@@ -42,9 +42,9 @@ func (e *Extractor) Extract(level, selector string) (string, error) {
 	}
 }
 
-// extractFull 提取完整HTML文档（包含head）
+// extractFull extracts complete HTML document (including head)
 func (e *Extractor) extractFull() (string, error) {
-	// 使用 JavaScript 获取完整的 HTML 文档，包括 DOCTYPE
+	// Use JavaScript to get complete HTML document, including DOCTYPE
 	result, err := e.page.Timeout(10 * time.Second).Eval(`() => {
 		return document.documentElement.outerHTML;
 	}`)
@@ -53,16 +53,16 @@ func (e *Extractor) extractFull() (string, error) {
 	}
 
 	html := e.page.MustObjectToJSON(result).String()
-	// 添加 DOCTYPE 声明（如果不存在）
+	// Add DOCTYPE declaration (if not exists)
 	if !strings.Contains(html, "<!DOCTYPE") {
 		html = "<!DOCTYPE html>\n" + html
 	}
 	return html, nil
 }
 
-// extractHTML 提取body内的所有HTML标签（包含script和style标签）
+// extractHTML extracts all HTML tags within body (including script and style tags)
 func (e *Extractor) extractHTML() (string, error) {
-	// 使用 JavaScript 提取 body 内容
+	// Use JavaScript to extract body content
 	result, err := e.page.Timeout(10 * time.Second).Eval(`() => {
 		const body = document.body;
 		return body ? body.innerHTML : '';
@@ -75,7 +75,7 @@ func (e *Extractor) extractHTML() (string, error) {
 	return bodyHTML, nil
 }
 
-// extractBody 提取body内的纯文本内容
+// extractBody extracts plain text content within body
 func (e *Extractor) extractBody() (string, error) {
 	result, err := e.page.Eval(`() => document.body.innerText`)
 	if err != nil {
@@ -86,9 +86,9 @@ func (e *Extractor) extractBody() (string, error) {
 	return text, nil
 }
 
-// extractContent 智能识别正文内容（Readability+选择器+降级策略）
+// extractContent intelligently identifies main content (Readability+selector+fallback strategy)
 func (e *Extractor) extractContent() (string, error) {
-	// 策略1：尝试使用 Readability 算法
+	// Strategy 1: Try to use Readability algorithm
 	hasReadability, err := e.page.Timeout(5 * time.Second).Eval(`() => typeof window.readability !== 'undefined'`)
 	if err == nil && e.page.MustObjectToJSON(hasReadability).Bool() {
 		result, err := e.page.Timeout(5 * time.Second).Eval(`() => {
@@ -103,7 +103,7 @@ func (e *Extractor) extractContent() (string, error) {
 		}
 	}
 
-	// 策略2：尝试常见内容选择器
+	// Strategy 2: Try common content selectors
 	selectors := []string{"article", "main", ".content", ".article", ".post", ".entry-content"}
 	for _, sel := range selectors {
 		element, err := e.page.Timeout(1 * time.Second).Element(sel)
@@ -115,7 +115,7 @@ func (e *Extractor) extractContent() (string, error) {
 		}
 	}
 
-	// 策略3：降级到 body 内容
+	// Strategy 3: Fallback to body content
 	html, err := e.extractHTML()
 	if err != nil {
 		return "", fmt.Errorf("failed to extract content: %w", err)
@@ -124,7 +124,7 @@ func (e *Extractor) extractContent() (string, error) {
 	return html, nil
 }
 
-// extractByXPath 使用 XPath 选择器提取内容
+// extractByXPath extracts content using XPath selector
 func (e *Extractor) extractByXPath(xpath string) (string, error) {
 	elements, err := e.page.Timeout(10 * time.Second).ElementsX(xpath)
 	if err != nil {
@@ -150,7 +150,7 @@ func (e *Extractor) extractByXPath(xpath string) (string, error) {
 	return content, nil
 }
 
-// extractByCSS 使用 CSS 选择器提取内容
+// extractByCSS extracts content using CSS selector
 func (e *Extractor) extractByCSS(selector string) (string, error) {
 	elements, err := e.page.Timeout(10 * time.Second).Elements(selector)
 	if err != nil {

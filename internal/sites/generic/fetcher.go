@@ -1,4 +1,4 @@
-package fetcher
+package generic
 
 import (
 	"encoding/json"
@@ -10,60 +10,60 @@ import (
 	"github.com/go-rod/rod"
 )
 
-// WaitStrategy 等待策略类型
+// WaitStrategy wait strategy type
 type WaitStrategy string
 
 const (
-	WaitStrategyLoad    WaitStrategy = "load"    // 等待页面完全加载
-	WaitStrategyElement WaitStrategy = "element" // 等待特定元素出现
-	WaitStrategyTime    WaitStrategy = "time"    // 等待固定时间
+	WaitStrategyLoad    WaitStrategy = "load"    // Wait for page to fully load
+	WaitStrategyElement WaitStrategy = "element" // Wait for specific element to appear
+	WaitStrategyTime    WaitStrategy = "time"    // Wait for fixed time
 )
 
-// FetchResult 抓取结果
+// FetchResult fetch result
 type FetchResult struct {
-	Page     *rod.Page     // 页面对象
-	Title    string        // 页面标题
-	URL      string        // 最终URL
-	LoadTime time.Duration // 加载时间
+	Page     *rod.Page     // Page object
+	Title    string        // Page title
+	URL      string        // Final URL
+	LoadTime time.Duration // Load time
 }
 
-// Fetcher 页面抓取器
+// Fetcher page fetcher
 type Fetcher struct {
 	browser *browser.Browser
 }
 
-// NewFetcher 创建新的 Fetcher 实例
+// NewFetcher creates a new Fetcher instance
 func NewFetcher(browser *browser.Browser) *Fetcher {
 	return &Fetcher{
 		browser: browser,
 	}
 }
 
-// SetBrowser 设置 Fetcher 使用的浏览器实例
+// SetBrowser sets the browser instance used by Fetcher
 func (f *Fetcher) SetBrowser(browser *browser.Browser) {
 	f.browser = browser
 }
 
-// Fetch 执行页面抓取
-// url: 目标URL
-// method: HTTP方法 (GET, POST, PUT, DELETE等)
-// headers: 请求头映射
-// body: 请求体 (对于POST/PUT等方法)
-// waitStrategy: 等待策略 (load/element/time)
-// waitTarget: 等待目标 (element策略的选择器或time策略的毫秒数)
-// timeout: 超时时间
+// Fetch executes page fetching
+// url: target URL
+// method: HTTP method (GET, POST, PUT, DELETE, etc.)
+// headers: request header map
+// body: request body (for POST/PUT methods)
+// waitStrategy: wait strategy (load/element/time)
+// waitTarget: wait target (selector for element strategy or milliseconds for time strategy)
+// timeout: timeout duration
 func (f *Fetcher) Fetch(url, method string, headers map[string]string, body string, waitStrategy WaitStrategy, waitTarget string, timeout time.Duration) (*FetchResult, error) {
 	startTime := time.Now()
 
-	// 创建新页面（不设置超时，避免影响后续操作）
+	// Create new page (no timeout to avoid affecting subsequent operations)
 	page, err := f.browser.NewPage()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create page: %w", err)
 	}
 
-	// 设置请求头
+	// Set request headers
 	if len(headers) > 0 {
-		// 将 map[string]string 转换为 []string 格式
+		// Convert map[string]string to []string format
 		headerList := make([]string, 0, len(headers)*2)
 		for k, v := range headers {
 			headerList = append(headerList, k, v)
@@ -76,7 +76,7 @@ func (f *Fetcher) Fetch(url, method string, headers map[string]string, body stri
 		defer cleanup()
 	}
 
-	// 执行HTTP请求
+	// Execute HTTP request
 	switch method {
 	case "GET":
 		if err := page.Timeout(timeout).Navigate(url); err != nil {
@@ -84,11 +84,11 @@ func (f *Fetcher) Fetch(url, method string, headers map[string]string, body stri
 			return nil, fmt.Errorf("failed to navigate: %w", err)
 		}
 	case "POST", "PUT", "DELETE", "PATCH":
-		// 对于需要请求体的方法，使用 JavaScript fetch API
-		// 然后将响应内容写入页面
+		// For methods requiring request body, use JavaScript fetch API
+		// Then write response content to page
 		var responseText string
 		if body != "" {
-			// 有请求体的情况
+			// Case with request body
 			result, err := page.Timeout(timeout).Eval(fmt.Sprintf(`() => {
 				return fetch('%s', {
 					method: '%s',
@@ -102,7 +102,7 @@ func (f *Fetcher) Fetch(url, method string, headers map[string]string, body stri
 			}
 			responseText = page.MustObjectToJSON(result).String()
 		} else {
-			// 无请求体的情况
+			// Case without request body
 			result, err := page.Timeout(timeout).Eval(fmt.Sprintf(`() => {
 				return fetch('%s', {
 					method: '%s',
@@ -116,7 +116,7 @@ func (f *Fetcher) Fetch(url, method string, headers map[string]string, body stri
 			responseText = page.MustObjectToJSON(result).String()
 		}
 
-		// 将响应内容写入页面
+		// Write response content to page
 		_, err := page.Eval(fmt.Sprintf(`() => {
 			document.open();
 			document.write(%s);
@@ -127,14 +127,14 @@ func (f *Fetcher) Fetch(url, method string, headers map[string]string, body stri
 			return nil, fmt.Errorf("failed to write response to page: %w", err)
 		}
 	case "HEAD", "OPTIONS":
-		// 对于 HEAD 和 OPTIONS，使用 JavaScript fetch API
-		// 这些方法不返回响应体，只返回响应头
+		// For HEAD and OPTIONS, use JavaScript fetch API
+		// These methods don't return response body, only response headers
 		result, err := page.Timeout(timeout).Eval(fmt.Sprintf(`() => {
 			return fetch('%s', {
 				method: '%s',
 				headers: %s
 			}).then(r => {
-				// 将响应头信息转换为文本
+				// Convert response header information to text
 				let headersText = '';
 				r.headers.forEach((value, key) => {
 					headersText += key + ': ' + value + '\\n';
@@ -147,7 +147,7 @@ func (f *Fetcher) Fetch(url, method string, headers map[string]string, body stri
 			return nil, fmt.Errorf("failed to execute %s request: %w", method, err)
 		}
 
-		// 将响应头信息写入页面
+		// Write response header information to page
 		headersText := page.MustObjectToJSON(result).String()
 		_, err = page.Eval(fmt.Sprintf(`() => {
 			document.open();
@@ -159,30 +159,30 @@ func (f *Fetcher) Fetch(url, method string, headers map[string]string, body stri
 			return nil, fmt.Errorf("failed to write response to page: %w", err)
 		}
 	default:
-		// 默认使用 GET
+		// Default to GET
 		if err := page.Timeout(timeout).Navigate(url); err != nil {
 			page.Close()
 			return nil, fmt.Errorf("failed to navigate: %w", err)
 		}
 	}
 
-	// 应用等待策略
+	// Apply wait strategy
 	if err := f.applyWaitStrategy(page, waitStrategy, waitTarget); err != nil {
 		page.Close()
 		return nil, fmt.Errorf("wait strategy failed: %w", err)
 	}
 
-	// 获取页面元数据
+	// Get page metadata
 	title, err := page.Eval(`() => document.title`)
 	if err != nil {
 		page.Close()
 		return nil, fmt.Errorf("failed to get page title: %w", err)
 	}
 
-	// 获取最终URL
+	// Get final URL
 	finalURL := page.MustInfo().URL
 
-	// 计算加载时间
+	// Calculate load time
 	loadTime := time.Since(startTime)
 
 	result := &FetchResult{
@@ -195,17 +195,17 @@ func (f *Fetcher) Fetch(url, method string, headers map[string]string, body stri
 	return result, nil
 }
 
-// applyWaitStrategy 应用等待策略
+// applyWaitStrategy applies wait strategy
 func (f *Fetcher) applyWaitStrategy(page *rod.Page, strategy WaitStrategy, target string) error {
 	switch strategy {
 	case WaitStrategyLoad:
-		// 等待页面完全加载
+		// Wait for page to fully load
 		if err := page.WaitLoad(); err != nil {
 			return fmt.Errorf("failed to wait for page load: %w", err)
 		}
 
 	case WaitStrategyElement:
-		// 等待特定元素出现
+		// Wait for specific element to appear
 		if target == "" {
 			return fmt.Errorf("wait target is required for element strategy")
 		}
@@ -214,7 +214,7 @@ func (f *Fetcher) applyWaitStrategy(page *rod.Page, strategy WaitStrategy, targe
 		}
 
 	case WaitStrategyTime:
-		// 等待固定时间
+		// Wait for fixed time
 		if target == "" {
 			return fmt.Errorf("wait target is required for time strategy")
 		}
@@ -225,7 +225,7 @@ func (f *Fetcher) applyWaitStrategy(page *rod.Page, strategy WaitStrategy, targe
 		time.Sleep(duration)
 
 	default:
-		// 默认等待页面加载
+		// Default to wait for page load
 		if err := page.WaitLoad(); err != nil {
 			return fmt.Errorf("failed to wait for page load: %w", err)
 		}
@@ -234,7 +234,7 @@ func (f *Fetcher) applyWaitStrategy(page *rod.Page, strategy WaitStrategy, targe
 	return nil
 }
 
-// headersToJS 将请求头映射转换为 JavaScript 对象字符串
+// headersToJS converts request header map to JavaScript object string
 func headersToJS(headers map[string]string) string {
 	if len(headers) == 0 {
 		return "{}"
@@ -247,10 +247,9 @@ func headersToJS(headers map[string]string) string {
 	return result
 }
 
-// stringToJS 将字符串转换为 JavaScript 字符串字面量
+// stringToJS converts a Go string to a JavaScript string literal using JSON encoding
+// to correctly escape all special characters.
 func stringToJS(s string) string {
-	// 使用 JSON 编码来正确转义字符串
-	// 将单引号替换为双引号，然后使用 JSON.Marshal 来转义
 	quoted, _ := json.Marshal(s)
 	return string(quoted)
 }
